@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barath Store - Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --sidebar-bg: #0f172a;
+            --sidebar-text: #94a3b8;
+            --active-text: #fff;
+            --primary: #2563eb;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            font-size: 16px;
+            /* Base size for mobile */
+        }
+
+        /* Sidebar - Desktop Default */
+        .sidebar {
+            width: 250px;
+            background: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            flex-shrink: 0;
+            transition: transform 0.3s ease;
+        }
+
+        .brand {
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 3rem;
+        }
+
+        .nav-item {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-item.active {
+            background: #1e293b;
+            color: var(--active-text);
+        }
+
+        /* Main Content */
+        .main {
+            flex: 1;
+            padding: 0;
+            /* Reset for sticky header handling */
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .top-bar {
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .hamburger {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.8rem;
+            cursor: pointer;
+            color: #1e293b;
+            padding: 0.5rem;
+        }
+
+        /* Stats Grid */
+        .stats-container {
+            padding: 0 2rem 2rem 2rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-val {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .stat-label {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        /* Orders List */
+        .orders-section {
+            padding: 0 2rem 2rem 2rem;
+            flex: 1;
+        }
+
+
+
+        .order-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+
+        .order-info {
+            flex: 1;
+            min-width: 0;
+            /* Text truncation fix */
+        }
+
+        .order-id {
+            font-weight: 700;
+            color: #0f172a;
+            font-family: monospace;
+            font-size: 1.1rem;
+        }
+
+        .order-details {
+            margin-top: 0.5rem;
+            color: #334155;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .order-sub {
+            color: #64748b;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        .order-actions {
+            display: flex;
+            gap: 1rem;
+            margin-left: 1rem;
+        }
+
+        /* Badges */
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .bg-pending {
+            background: #fef9c3;
+            color: #b45309;
+        }
+
+        .bg-paid {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .bg-verify {
+            background: #e0f2fe;
+            color: #075985;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        /* Buttons */
+        .btn {
+            border: none;
+            padding: 0.75rem 1.5rem;
+            /* Larger touch target */
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s;
+            min-height: 44px;
+            /* Mobile standard */
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-outline {
+            background: white;
+            border: 2px solid #e2e8f0;
+            color: #475569;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Overlay */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 900;
+        }
+
+        /* --- MOBILE RESPONSIVE --- */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -280px;
+                height: 100%;
+                z-index: 1000;
+                width: 80%;
+                max-width: 300px;
+            }
+
+            .sidebar.open {
+                left: 0;
+            }
+
+            .overlay.active {
+                display: block;
+            }
+
+            .hamburger {
+                display: block;
+            }
+
+            .main {
+                padding: 0;
+            }
+
+            .top-bar {
+                padding: 1rem;
+            }
+
+            .stats-container {
+                padding: 0 1rem 1rem 1rem;
+            }
+
+            .orders-section {
+                padding: 0 1rem 1rem 1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+                /* Stack stats */
+                gap: 1rem;
+            }
+
+            .order-card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1.5rem;
+            }
+
+            .order-actions {
+                width: 100%;
+                margin-left: 0;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                /* Split buttons */
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .btn-success {
+                grid-column: span 2;
+                /* Done button full width */
+            }
+
+            .header-controls {
+                display: none;
+            }
+
+            /* Use sidebar for logout/scan */
+
+            .mobile-only {
+                display: flex !important;
+            }
+        }
+
+        .mobile-only {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="overlay" onclick="toggleSidebar()"></div>
+
+    <nav class="sidebar">
+        <div class="brand">Barath Store</div>
+        <div class="nav-item active">Dashboard</div>
+        <div class="nav-item" onclick="fetchData()">🔄 Refresh</div>
+        <div class="nav-item mobile-only" onclick="openScanner(); toggleSidebar()">📷 Scan QR</div>
+        <div class="nav-item mobile-only" onclick="location.href='/admin/logout'">🚪 Logout</div>
+    </nav>
+
+    <main class="main">
+        <div class="top-bar">
+            <div style="display:flex; align-items:center; gap: 1rem;">
+                <button class="hamburger" onclick="toggleSidebar()">☰</button>
+                <h2 style="margin:0; font-size: 1.5rem; color: #1e293b;">Dashboard</h2>
+            </div>
+
+            <div class="header-controls" style="display:flex; align-items:center; gap:1rem;">
+                <button class="btn btn-primary" onclick="openScanner()">📷 Scan Order</button>
+                <div id="liveIndicator"
+                    style="display:flex; align-items:center; gap:5px; color:#22c55e; font-weight:600; font-size:0.9rem;">
+                    <span style="font-size:1.2rem;">●</span> Live
+                </div>
+                <button class="btn btn-outline" onclick="location.href='/admin/logout'">Logout</button>
+            </div>
+        </div>
+
+        <div class="stats-container">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-val" id="countPending">-</div>
+                    <div class="stat-label">Pending Prints</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" id="countVerify">-</div>
+                    <div class="stat-label">UPI Verification</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" id="revenueToday">₹-</div>
+                    <div class="stat-label">Today's Revenue</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="orders-section">
+            <h3 style="margin-top:0; color:#475569; margin-bottom:1rem;">Incoming Orders</h3>
+            <div id="ordersList">
+                <div style="text-align:center; padding:3rem; color:#94a3b8;">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Scanner Modal -->
+        <div id="scannerModal"
+            style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:2000; justify-content:center; align-items:center;">
+            <div style="background:white; padding:1.5rem; border-radius:16px; width:90%; max-width:400px;">
+                <h3 style="margin-top:0;">Scan QR Code</h3>
+                <div id="reader"></div>
+                <button class="btn btn-outline" style="width:100%; margin-top:1rem;"
+                    onclick="closeScanner()">Close</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- STATE & CONFIG ---
+        let orders = [];
+        let isPolling = false;
+        let lastSeenId = localStorage.getItem('lastSeenId');
+        let audioCtx = null;
+        let hiddenOrders = new Set(); // Local cache of 'Done' orders to prevent blink
+
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.addEventListener('click', initAudio, { once: true });
+            fetchData(); // Initial Load
+            setInterval(fetchData, 4000); // Poll Loop
+        });
+
+        // --- CORE LOGIC ---
+
+        // 1. Fetch Source of Truth
+        async function fetchData() {
+            if (isPolling) return;
+            isPolling = true;
+
+            try {
+                // Parallel fetch for speed with Cache Busting
+                const timestamp = Date.now();
+                const [resOrders, resStats] = await Promise.all([
+                    fetch(`/api/shop/orders?t=${timestamp}`),
+                    fetch(`/api/shop/stats?t=${timestamp}`)
+                ]);
+
+                if (resOrders.status === 401) window.location.reload();
+
+                const newOrders = await resOrders.json();
+                const stats = await resStats.json();
+
+                // Detect New Order (Sound)
+                if (newOrders.length > 0) {
+                    const topId = newOrders[0].id;
+                    if (lastSeenId && topId !== lastSeenId) {
+                        playDing();
+                    }
+                    lastSeenId = topId;
+                    localStorage.setItem('lastSeenId', topId);
+                }
+
+                // Update State
+                orders = newOrders;
+                updateStatsUI(stats);
+                renderOrders();
+
+                // Connection Status
+                document.getElementById('liveIndicator').style.color = '#22c55e';
+
+            } catch (e) {
+                console.error("Fetch error", e);
+                document.getElementById('liveIndicator').style.color = '#ef4444';
+            } finally {
+                isPolling = false;
+            }
+        }
+
+        // 2. Render Orders (React-like)
+        function renderOrders() {
+            const list = document.getElementById('ordersList');
+
+            // Filter: Active AND not locally hidden
+            const displayOrders = orders.filter(o => !hiddenOrders.has(o.id));
+
+            if (displayOrders.length === 0) {
+                list.innerHTML = `
+                    <div style="text-align:center; padding:3rem; background:white; border-radius:12px;">
+                        <div style="font-size:2rem;">🎉</div>
+                        <div style="color:#64748b; margin-top:1rem;">All caught up! No active orders.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Efficient HTML Generation
+            list.innerHTML = displayOrders.map(o => {
+                // Determine Badge
+                let badge = `<span class="badge bg-pending">${o.payment_status}</span>`;
+                if (o.payment_status === 'PAID') badge = `<span class="badge bg-paid">PAID</span>`;
+                if (o.payment_status === 'PENDING_VERIFICATION') badge = `<span class="badge bg-verify">VERIFY UPI</span>`;
+
+                // Actions
+                let actions = '';
+
+                // Verify Button
+                if (o.payment_status === 'PENDING_VERIFICATION') {
+                    actions += `<button class="btn btn-primary" onclick="handlePayVerify('${o.id}')">Verify</button>`;
+                }
+
+                // Download Button (Always)
+                actions += `<button class="btn btn-outline" onclick="window.open('/api/shop/order-file/${o.id}', '_blank')">Download</button>`;
+
+                // Done Button (Big & Green)
+                actions += `<button id="btn-done-${o.id}" class="btn btn-success" onclick="handleDone('${o.id}')">Done</button>`;
+
+                return `
+                    <div class="order-card" id="card-${o.id}">
+                        <div class="order-info">
+                            <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
+                                <span class="order-id">#${o.id.substring(0, 6)}</span>
+                                ${badge}
+                            </div>
+                            <div class="order-details">
+                                <strong>${o.customer_name}</strong><br>
+                                ${o.total_sheets} Sheets • ${o.print_color} • ₹${o.total_amount}
+                            </div>
+                            <div class="order-sub">
+                                ${o.file_name} (${o.pages} pages, ${o.copies} copies)
+                            </div>
+                        </div>
+                        <div class="order-actions">
+                            ${actions}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 3. Update Stats
+        function updateStatsUI(stats) {
+            if (!stats) return;
+            // Animate numbers? Simple text replace for now
+            document.getElementById('countPending').textContent = stats.pending_print;
+            document.getElementById('countVerify').textContent = stats.upi_verify;
+            document.getElementById('revenueToday').textContent = `₹${stats.revenue_today}`;
+        }
+
+        // --- ACTIONS ---
+
+        // A. Handle 'Done' (Critical Path)
+        async function handleDone(id) {
+            const btn = document.getElementById(`btn-done-${id}`);
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = '...';
+            }
+
+            try {
+                // 1. API Update
+                const res = await fetch(`/api/shop/orders/${id}/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'COMPLETED' })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || "Update failed");
+                }
+
+                // 2. Update Local State (Immediate Feedback)
+                hiddenOrders.add(id);
+
+                // 3. Re-Sync EVERYTHING (To update stats correctly)
+                await fetchData();
+
+            } catch (e) {
+                alert("Error completing order: " + e.message);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = 'Done';
+                }
+            }
+        }
+
+        // B. Handle Verify
+        async function handlePayVerify(id) {
+            if (!confirm("Confirm UPI payment received?")) return;
+
+            try {
+                const res = await fetch(`/api/shop/orders/${id}/payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'PAID' })
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || "Payment verify failed");
+                }
+                fetchData(); // Refresh to update status
+            } catch (e) {
+                alert("Verify failed");
+            }
+        }
+
+        // --- UTILS ---
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.overlay').classList.toggle('active');
+        }
+
+        function initAudio() {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+        }
+
+        function playDing() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.5);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.5);
+        }
+
+        // Scanner
+        let scanner = null;
+        function openScanner() {
+            document.getElementById('scannerModal').style.display = 'flex';
+            scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 }, false);
+            scanner.render(onScanSuccess);
+        }
+        function closeScanner() {
+            document.getElementById('scannerModal').style.display = 'none';
+            if (scanner) scanner.clear();
+        }
+        async function onScanSuccess(decodedText) {
+            closeScanner();
+            // Verify
+            try {
+                const res = await fetch('/api/shop/qr-verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order_id: decodedText })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert("Verified! ✅");
+                    fetchData();
+                } else {
+                    alert("Error: " + data.error);
+                }
+            } catch (e) {
+                alert("Scan failed");
+            }
+        }
+    </script>
+</body>
+
+</html>

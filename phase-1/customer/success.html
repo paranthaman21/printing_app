@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Placed!</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <style>
+        .success-icon-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .checkmark-circle {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #dcfce7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .checkmark {
+            width: 40px;
+            height: 40px;
+            fill: var(--accent);
+            opacity: 0;
+            animation: fadeIn 0.3s 0.4s forwards;
+        }
+
+        @keyframes popIn {
+            from {
+                transform: scale(0);
+            }
+
+            to {
+                transform: scale(1);
+            }
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+        .order-id-box {
+            background: #f0fdf4;
+            border: 2px dashed #86efac;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .id-label {
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.8rem;
+            color: #15803d;
+            font-weight: 600;
+        }
+
+        .id-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #166534;
+            margin: 0.5rem 0;
+            font-family: monospace;
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            box-shadow: none;
+        }
+
+        .btn-outline:hover {
+            background: #eff6ff;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="card" style="text-align: center;">
+            <div class="success-icon-container">
+                <div class="checkmark-circle">
+                    <svg class="checkmark" viewBox="0 0 24 24">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                </div>
+            </div>
+
+            <h1 style="color: var(--text-color);">Order Placed!</h1>
+            <p style="color: var(--text-muted);">Thank you. Your documents are queued.</p>
+
+            <div class="order-id-box">
+                <div class="id-label">Order ID</div>
+                <div class="id-value" id="orderId">...</div>
+                <div id="qrcode" style="display: flex; justify-content: center; margin-top: 1rem;"></div>
+            </div>
+
+            <div class="action-grid">
+                <button class="btn-outline" onclick="window.print()">
+                    Save Receipt
+                </button>
+                <button onclick="window.location.href='index.html'">
+                    Print New
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QRCode JS Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <script>
+        const order = JSON.parse(localStorage.getItem('lastOrder'));
+        if (order) {
+            document.getElementById('orderId').textContent = order.id.slice(0, 8).toUpperCase(); // Show short ID for better UX? Or full. Let's show first 8 chars or full if uuid. 
+            // Actually, keep full UUID for scan, but display can be truncated or small. 
+            // For now, let's show full ID in tooltip or small text, but huge text might be bad.
+            // Let's just show it. 
+            document.getElementById('orderId').textContent = order.id;
+
+            // Generate QR Code
+            new QRCode(document.getElementById("qrcode"), {
+                text: order.id,
+                width: 128,
+                height: 128,
+                colorDark: "#15803d",
+                colorLight: "#f0fdf4"
+            });
+        }
+    </script>
+</body>
+
+</html>
