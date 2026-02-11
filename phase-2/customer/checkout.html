@@ -101,15 +101,18 @@
 
                 <div class="form-group">
                     <label>Payment Method</label>
-                    <div class="option-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 1rem; display: flex; justify-content: space-between; gap: 1rem;">
-                        <div class="option-card active" onclick="selectPayment('PAY_AT_SHOP', this)" id="pay-shop" style="border: 2px solid var(--border-color); padding: 1rem; border-radius: 12px;">
+                    <div class="option-grid"
+                        style="grid-template-columns: 1fr 1fr; margin-bottom: 1rem; display: flex; justify-content: space-between; gap: 1rem;">
+                        <div class="option-card active" onclick="selectPayment('PAY_AT_SHOP', this)" id="pay-shop"
+                            style="border: 2px solid var(--border-color); padding: 1rem; border-radius: 12px;">
                             <svg class="icon" viewBox="0 0 24 24"
                                 style="width: 28px; height: 28px; margin-bottom: 8px; fill: var(--primary);">
                                 <path d="M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 6H6v-6h6v6z" />
                             </svg>
                             <div class="opt-title">Pay at Shop</div>
                         </div>
-                        <div class="option-card" onclick="selectPayment('UPI', this)" id="pay-upi" style="border: 2px solid var(--border-color); padding: 1rem; border-radius: 12px;">
+                        <div class="option-card" onclick="selectPayment('UPI', this)" id="pay-upi"
+                            style="border: 2px solid var(--border-color); padding: 1rem; border-radius: 12px;">
                             <svg class="icon" viewBox="0 0 24 24"
                                 style="width: 28px; height: 28px; margin-bottom: 8px; fill: var(--primary);">
                                 <path
@@ -138,8 +141,21 @@
                     </div>
                 </div>
 
+                <div class="form-group" style="margin-top: 1rem; display: flex; align-items: start; gap: 10px;">
+                    <input type="checkbox" id="termsConsent" required
+                        style="width: 20px; height: 20px; margin-top: 2px;">
+                    <label for="termsConsent" style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.4;">
+                        I agree to the <a href="terms.html" target="_blank" style="color: var(--primary);">Terms &
+                            Conditions</a> and <a href="privacy.html" target="_blank"
+                            style="color: var(--primary);">Privacy Policy</a>.
+                    </label>
+                </div>
+
                 <button type="submit" id="submitBtn">Place Order</button>
             </form>
+            <div style="text-align: center; margin-top: 1.5rem; font-size: 0.8rem;">
+                <a href="legal.html" style="color: #94a3b8; text-decoration: none;">Legal & Privacy</a>
+            </div>
         </div>
     </div>
 

@@ -41,9 +41,10 @@
             color: var(--sidebar-text);
             display: flex;
             flex-direction: column;
-            padding: 1.5rem;
+            padding: 1rem;
             flex-shrink: 0;
             transition: transform 0.3s ease;
+            margin-left: -15px;
         }
 
         .brand {
@@ -51,6 +52,7 @@
             font-size: 1.5rem;
             font-weight: 700;
             margin-bottom: 3rem;
+            margin-left: 15px;
         }
 
         .nav-item {
@@ -370,7 +372,7 @@
         <div class="nav-item active">Dashboard</div>
         <div class="nav-item" onclick="fetchData()">🔄 Refresh</div>
         <div class="nav-item mobile-only" onclick="openScanner(); toggleSidebar()">📷 Scan QR</div>
-        <div class="nav-item mobile-only" onclick="location.href='/admin/logout'">🚪 Logout</div>
+        <div class="nav-item mobile-only" onclick="handleLogout()">🚪 Logout</div>
     </nav>
 
     <main class="main">
@@ -379,14 +381,15 @@
                 <button class="hamburger" onclick="toggleSidebar()">☰</button>
                 <h2 style="margin:0; font-size: 1.5rem; color: #1e293b;">Dashboard</h2>
             </div>
-
             <div class="header-controls" style="display:flex; align-items:center; gap:1rem;">
-                <button class="btn btn-primary" onclick="openScanner()">📷 Scan Order</button>
+                <button class="btn btn-outline" onclick="handleLogout()"
+                    style="display: flex; align-items: center; gap: 5px;">
+                    <span>Wait, Logout</span>
+                </button>
                 <div id="liveIndicator"
                     style="display:flex; align-items:center; gap:5px; color:#22c55e; font-weight:600; font-size:0.9rem;">
                     <span style="font-size:1.2rem;">●</span> Live
                 </div>
-                <button class="btn btn-outline" onclick="location.href='/admin/logout'">Logout</button>
             </div>
         </div>
 
@@ -639,6 +642,18 @@
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
             osc.start();
             osc.stop(audioCtx.currentTime + 0.5);
+        }
+
+        async function handleLogout() {
+            if (!confirm("Are you sure you want to logout?")) return;
+            try {
+                await fetch('/admin/logout', { method: 'POST' });
+                window.location.href = '/admin/logged-out';
+            } catch (e) {
+                console.error("Logout failed", e);
+                // Force client-side redirect even if fetch fails
+                window.location.href = '/admin/login';
+            }
         }
 
         // Scanner

@@ -1,10 +1,15 @@
 import os
 import shutil
 import uuid
-from flask import Flask, request, jsonify, send_from_directory, session, redirect, send_file
+from flask import Flask, request, jsonify, send_from_directory, session, redirect, send_file, make_response
+from functools import wraps
 from dotenv import load_dotenv
 import time
 from db import get_supabase_client
+from werkzeug.utils import secure_filename
+from pricing import calculate_total
+from urllib.parse import unquote
+from datetime import datetime, timedelta, timezone
 
 # Load .env from parent directory (phase-2/.env)
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
@@ -36,8 +41,16 @@ def add_security_headers(response):
         response.headers['Access-Control-Allow-Origin'] = 'http://127.0.0.1:5001'
     return response
 
-# Helper: Store tokens
-download_tokens = {}
+# Decorator: Login Required
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "Unauthorized"}), 401
+            return redirect('/admin/login')
+        return f(*args, **kwargs)
+    return decorated_function
 
 # --- Shopkeeper Routes ---
 
@@ -46,53 +59,54 @@ def index():
     return redirect('/admin')
 
 @app.route('/admin')
+@login_required
 def admin_dashboard():
-    if not session.get('logged_in'):
-        return send_from_directory('../shopkeeper', 'login.html')
     return send_from_directory('../shopkeeper', 'dashboard.html')
 
-@app.route('/admin/login', methods=['POST'])
+@app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
+    if request.method == 'GET':
+        if session.get('logged_in'):
+             return redirect('/admin')
+        return send_from_directory('../shopkeeper', 'login.html')
+        
     data = request.json
     if data.get('password') == ADMIN_PASSWORD:
         session['logged_in'] = True
         return jsonify({"success": True})
     return jsonify({"success": False, "error": "Invalid Password"}), 401
 
-@app.route('/admin/logout')
+@app.route('/admin/logout', methods=['POST'])
 def admin_logout():
-    session.pop('logged_in', None)
+    session.clear()
     return jsonify({"success": True})
+
+@app.route('/admin/logged-out')
+def admin_logged_out():
+    return send_from_directory('../shopkeeper', 'logout.html')
 
 # Serve Shopkeeper Pages
 @app.route('/shopkeeper/<path:path>')
+@login_required
 def serve_shop_pages(path):
-    if not session.get('logged_in') and 'login.html' not in path:
-        return redirect('/admin')
-    return send_from_directory('../shopkeeper', path)
+    response = make_response(send_from_directory('../shopkeeper', path))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    return response
 
-# Serve Shared Static Assets (CSS/JS) if needed, or specific shop assets
-# Phase 2 has its own static folder now, so we serve from there
+# Serve Shared Static Assets (CSS/JS)
 @app.route('/static/<path:path>')
 def serve_static(path):
     return send_from_directory('../static', path)
 
-
-# --- API Endpoints (Shopkeeper Only) ---
-
-from datetime import datetime, timedelta, timezone
-
-# ... imports ...
+# --- API Endpoints ---
 
 @app.route('/api/shop/stats', methods=['GET'])
+@login_required
 def get_shop_stats():
-    if not session.get('logged_in'):
-        return jsonify({"error": "Unauthorized"}), 401
-        
     try:
         supabase = get_supabase_client()
         
-        # 1. Pending Prints (Active orders)
+        # 1. Pending Prints
         res_pending = supabase.client.table('orders').select('id', count='exact').neq('order_status', 'COMPLETED').execute()
         count_pending = res_pending.count if res_pending.count is not None else len(res_pending.data)
         
@@ -100,44 +114,140 @@ def get_shop_stats():
         res_verify = supabase.client.table('orders').select('id', count='exact').eq('payment_status', 'PENDING_VERIFICATION').execute()
         count_verify = res_verify.count if res_verify.count is not None else len(res_verify.data)
         
-        # 3. Today's Revenue (IST)
-        # IST is UTC+5:30
+        # 3. Today's Revenue
         ist_offset = timezone(timedelta(hours=5, minutes=30))
         now_ist = datetime.now(ist_offset)
         start_of_day_ist = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
-        # Convert to UTC for database query
         start_of_day_utc = start_of_day_ist.astimezone(timezone.utc)
         
-        print(f"[REVENUE DEBUG] Current IST: {now_ist}")
-        print(f"[REVENUE DEBUG] Start of day UTC: {start_of_day_utc.isoformat()}")
-        
         res_revenue = supabase.client.table('orders')\
-            .select('total_amount, payment_status, created_at')\
+            .select('total_amount')\
             .eq('payment_status', 'PAID')\
             .gte('created_at', start_of_day_utc.isoformat())\
             .execute()
-        
-        print(f"[REVENUE DEBUG] Found {len(res_revenue.data or [])} PAID orders")
-        print(f"[REVENUE DEBUG] Revenue data: {res_revenue.data}")
             
         revenue = sum((item.get('total_amount') or 0) for item in (res_revenue.data or []))
-        print(f"[REVENUE DEBUG] Total revenue: {revenue}")
         
         return jsonify({
             "pending_print": count_pending,
             "upi_verify": count_verify,
             "revenue_today": revenue
         })
-        
     except Exception as e:
-        print(f"Stats error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/create-order', methods=['POST'])
+def create_order():
+    data = request.json
+    
+    # 1. Consent Enforcement
+    if not data.get('accepted_terms'):
+        return jsonify({"error": "You must accept the Terms & Conditions and Privacy Policy to proceed."}), 400
+
+    # 2. Metadata Capture
+    ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+    user_agent = request.headers.get('User-Agent')
+    accepted_at = datetime.now(timezone.utc).isoformat()
+    
+    # 3. Rate Limiting (Simple IP based)
+    try:
+        supabase = get_supabase_client()
+        # Check last order from this IP
+        last_order = supabase.client.table('orders').select('created_at').eq('ip_address', ip_address).order('created_at', desc=True).limit(1).execute()
+        if last_order.data:
+            last_ts_str = last_order.data[0]['created_at']
+            # Parse ISO (handle Z if present)
+            last_ts = datetime.fromisoformat(last_ts_str.replace('Z', '+00:00'))
+            if (datetime.now(timezone.utc) - last_ts).total_seconds() < 60:
+                 return jsonify({"error": "Rate limit exceeded. Please wait 1 minute."}), 429
+    except Exception as e:
+        print(f"Rate limit check fail: {e}")
+        # Fail open (allow order) if rate limit check fails
+
+    try:
+        # Calculate final price again to prevent tampering
+        price_info = calculate_total(
+            pages=data.get('pages', 1),
+            copies=data.get('copies', 1),
+            color=data.get('color', 'BW'),
+            sides=data.get('sides', 'SINGLE')
+        )
+        
+        order_data = {
+            "customer_name": data.get('customer_name'),
+            "customer_phone": data.get('customer_phone'),
+            "file_name": data.get('file_name'),
+            "file_url": data.get('file_url'),
+            "pages": data.get('pages'),
+            "copies": data.get('copies'),
+            "total_sheets": price_info['total_sheets'],
+            "print_color": data.get('color'),
+            "total_amount": price_info['price'],
+            "payment_method": data.get('payment_method'),
+            "payment_status": "PENDING_VERIFICATION" if data.get('payment_method') == 'UPI' else "PENDING",
+            "order_status": "PENDING",
+            # Consent Data
+            "accepted_terms": True,
+            "accepted_at": accepted_at,
+            "ip_address": ip_address,
+            "user_agent": user_agent
+        }
+        
+        res = supabase.client.table('orders').insert(order_data).execute()
+        
+        if res.data:
+            return jsonify({"status": "success", "order": res.data[0]})
+        else:
+            return jsonify({"error": "Failed to create order"}), 500
+            
+    except Exception as e:
+        print(f"Create order error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/cron/cleanup')
+def cron_cleanup():
+    # Security: Require CRON_SECRET
+    secret = os.environ.get('CRON_SECRET')
+    if not secret:
+        # Fail secure if not configured
+        return jsonify({"error": "Cron secret not configured on server"}), 500
+        
+    auth_header = request.headers.get('Authorization')
+    if auth_header != f"Bearer {secret}":
+         return jsonify({"error": "Unauthorized"}), 401
+
+    # Cleanup files for orders older than 24 hours
+    try:
+        supabase = get_supabase_client()
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        
+        # Find orders with files created > 24h ago
+        res = supabase.client.table('orders').select('id, file_url').lt('created_at', cutoff).execute()
+        
+        count = 0
+        deleted_log = []
+        for order in (res.data or []):
+            if order.get('file_url'):
+                # Delete
+                f_url = order['file_url']
+                try:
+                    if '/uploads/' in f_url:
+                        path = unquote(f_url.split('/uploads/')[-1])
+                        supabase.client.storage.from_("uploads").remove([path])
+                        deleted_log.append(path)
+                except: pass
+                
+                # Update DB
+                supabase.client.table('orders').update({"file_url": None}).eq("id", order['id']).execute()
+                count += 1
+                
+        return jsonify({"success": True, "deleted_count": count, "files": deleted_log})
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/shop/orders', methods=['GET'])
+@login_required
 def get_shop_orders():
-    if not session.get('logged_in'):
-        return jsonify({"error": "Unauthorized"}), 401
-        
     try:
         supabase = get_supabase_client()
         # Fetch ACTIVE orders only (exclude COMPLETED)
@@ -149,31 +259,41 @@ def get_shop_orders():
         print(f"Fetch orders error: {e}")
         return jsonify([]), 500
 
+def log_admin_action(action_type, order_id=None):
+    try:
+        supabase = get_supabase_client()
+        ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+        supabase.client.table('admin_logs').insert({
+            "action_type": action_type,
+            "order_id": order_id,
+            "admin_ip": ip,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }).execute()
+    except Exception as e:
+        print(f"[LOG ERROR] Failed to log {action_type}: {e}")
+
 @app.route('/api/shop/orders/<order_id>/status', methods=['POST'])
+@login_required
 def update_order_status(order_id):
-    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.json
     new_status = data.get('status')
     
     try:
         supabase = get_supabase_client()
-        print(f"[DEBUG] Attempting to update order {order_id} to status: {new_status}")
         res = supabase.client.table('orders').update({"order_status": new_status}).eq("id", order_id).execute()
-        print(f"[DEBUG] Response data: {res.data}")
-        print(f"[DEBUG] Response count: {len(res.data) if res.data else 0}")
         if not res.data:
-            print(f"Update failed for {order_id}: RLS/Permissions or ID not found")
             return jsonify({"error": "Update failed. Database Permissions (RLS) blocked the change."}), 500
+        
+        # Audit Log
+        log_admin_action(f"UPDATE_STATUS_{new_status}", order_id)
+
         return jsonify({"success": True})
     except Exception as e:
-        print(f"[ERROR] Exception during update: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/shop/orders/<order_id>/payment', methods=['POST'])
+@login_required
 def update_payment_status(order_id):
-    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.json
     new_status = data.get('status') # e.g., 'PAID'
     
@@ -181,68 +301,75 @@ def update_payment_status(order_id):
         supabase = get_supabase_client()
         res = supabase.client.table('orders').update({"payment_status": new_status}).eq("id", order_id).execute()
         if not res.data:
-            print(f"Payment update failed for {order_id}: RLS/Permissions")
             return jsonify({"error": "Payment Update failed. Database Permissions (RLS) blocked the change."}), 500
+        
+        # Audit Log
+        log_admin_action(f"UPDATE_PAYMENT_{new_status}", order_id)
+
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- SECURE QR & FILE HANDLING ---
-
-from urllib.parse import unquote
-
-# ... imports ...
-
 @app.route('/api/shop/qr-verify', methods=['POST'])
+@login_required
 def verify_qr_order():
-    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-    
     data = request.json
     order_id = data.get('order_id')
     
     try:
         supabase = get_supabase_client()
-        # 1. Fetch Order to confirm it exists
+        # 1. Fetch Order
         res = supabase.client.table('orders').select("*").eq('id', order_id).execute()
         if not res.data:
             return jsonify({"error": "Order not found"}), 404
         
         order = res.data[0]
         
-        # 2. Mark as COMPLETED (Verify & "Delete" from dashboard view)
+        # 2. Mark as COMPLETED and Payment PAID
         supabase.client.table('orders').update({
             "order_status": "COMPLETED",
-            "payment_status": "PAID" # Ensure it's marked paid if they are picking up
+            "payment_status": "PAID"
         }).eq("id", order_id).execute()
+        
+        # Audit Log
+        log_admin_action("QR_VERIFY_COMPLETE", order_id)
+        
+        # 3. Secure Deletion (File Lifecycle Policy)
+        # Delete file immediately upon completion
+        file_url = order.get('file_url')
+        if file_url:
+            print(f"[SECURE] Deleting file for order {order_id}")
+            try:
+                if '/uploads/' in file_url:
+                    path = unquote(file_url.split('/uploads/')[-1])
+                    supabase.client.storage.from_("uploads").remove([path])
+            except Exception as e:
+                print(f"[DELETE ERROR] {e}")
+                
+            # Remove link from DB
+            supabase.client.table('orders').update({
+                "file_url": None
+            }).eq("id", order_id).execute()
         
         return jsonify({
             "success": True, 
-            "message": "Order verified and completed successfully."
+            "message": "Order verified and completed. File securely deleted."
         })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 def find_upload_path(filename):
-    # Decode URL-encoded filename (e.g. "My%20File.pdf" -> "My File.pdf")
     decoded_name = unquote(filename)
-    
     # Check phase-2 uploads
     p2_path = os.path.join(app.root_path, '../uploads', decoded_name)
     if os.path.exists(p2_path):
         return p2_path
-    
-    # Check phase-1 uploads (fallback)
-    p1_path = os.path.abspath(os.path.join(app.root_path, '../../phase-1/uploads', decoded_name))
-    if os.path.exists(p1_path):
-        return p1_path
-        
     return None
 
 @app.route('/api/shop/order-file/<order_id>', methods=['GET'])
+@login_required
 def serve_order_file(order_id):
-    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         supabase = get_supabase_client()
         res = supabase.client.table('orders').select("*").eq('id', order_id).execute()
@@ -254,40 +381,93 @@ def serve_order_file(order_id):
         if not file_url:
              return jsonify({"error": "No file url in order"}), 404
              
-        # Extract filename from URL (handle cases like http://localhost:5000/uploads/My%20File.pdf)
-        # 1. Get last part
-        raw_name = file_url.split('/')[-1]
-        # 2. Remove queries
-        raw_name = raw_name.split('?')[0]
-        # 3. Decode
+        raw_name = file_url.split('/')[-1].split('?')[0]
         filename = unquote(raw_name)
-        
         file_path = find_upload_path(filename)
         
         # 1. Try Local File
         if file_path and os.path.exists(file_path):
-            # Check for size 0 (corrupted upload)
             if os.path.getsize(file_path) > 0:
-                print(f"Serving local file: {file_path}")
                 mime = 'application/pdf' if filename.lower().endswith('.pdf') else None
+                log_admin_action("FILE_DOWNLOAD", order_id)
                 return send_file(file_path, mimetype=mime)
-            else:
-                print(f"Local file found but empty: {file_path}")
                 
-        # 2. Fallback: Redirect to the URL (Supabase or Phase 1 Server)
-        # If local file is missing or empty, maybe the URL points to a valid cloud resource 
-        # or the other server can handle it.
+        # 2. Fallback: Redirect
         if file_url.startswith('http'):
-            print(f"Redirecting to source URL: {file_url}")
+            log_admin_action("FILE_DOWNLOAD", order_id)
             return redirect(file_url)
             
-        return jsonify({"error": f"File '{filename}' not found locally and no valid URL to redirect."}), 404
+        return jsonify({"error": f"File not found or URL invalid."}), 404
         
     except Exception as e:
-        print(f"Serve error: {e}")
         return jsonify({"error": str(e)}), 500
-        
 
+# --- Public Customer Endpoints ---
+
+@app.route('/api/config')
+def get_config():
+    return jsonify({
+        "shop_name": os.environ.get("SHOP_NAME", "Barath Store"),
+        "upi_id": os.environ.get("UPI_ID", "kalpanav856-1@oksbi")
+    })
+
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+
+    if file:
+        filename = secure_filename(file.filename)
+        try:
+            supabase = get_supabase_client()
+            file_content = file.read()
+            unique_name = f"{uuid.uuid4()}_{filename}"
+            
+            res = supabase.client.storage.from_("uploads").upload(
+                path=unique_name,
+                file=file_content,
+                file_options={"content-type": file.content_type}
+            )
+            
+            public_url = supabase.client.storage.from_("uploads").get_public_url(unique_name)
+            
+            pages = 1 
+            if filename.lower().endswith('.pdf'):
+                try:
+                    import pypdf
+                    from io import BytesIO
+                    pdf_file = pypdf.PdfReader(BytesIO(file_content))
+                    pages = len(pdf_file.pages)
+                except:
+                    print("Could not count PDF pages, defaulting to 1")
+
+            return jsonify({
+                "message": "File uploaded successfully",
+                "url": public_url,
+                "filename": unique_name, 
+                "pages": pages,
+                "type": "PDF" if filename.lower().endswith('.pdf') else "IMAGE"
+            })
+            
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+@app.route('/api/calculate-price', methods=['POST'])
+def calculate_price_endpoint():
+    try:
+        data = request.json
+        res = calculate_total(
+            pages=data.get('pages', 1),
+            copies=data.get('copies', 1),
+            color=data.get('color', 'BW'),
+            sides=data.get('sides', 'SINGLE')
+        )
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

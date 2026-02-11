@@ -242,7 +242,8 @@ async function handleCheckout(event) {
         orientation: options.orientation,
         customer_name: name,
         customer_phone: phone,
-        payment_method: paymentMethod
+        payment_method: paymentMethod,
+        accepted_terms: document.getElementById('termsConsent').checked
     };
 
     const btn = event.target.querySelector('button');
