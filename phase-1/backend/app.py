@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 import PyPDF2
 import io
 import time
-from pricing import calculate_total
-from payments import process_payment
+from .pricing import calculate_total
+from .payments import process_payment
 # from supabase import get_supabase_client # Import later to avoid init error if env vars missing during dev
 
 load_dotenv()
