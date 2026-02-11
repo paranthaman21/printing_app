@@ -1,47 +1,22 @@
 {
     "version": 2,
     "name": "barath-store-shopkeeper",
-    "crons": [
-        {
-            "path": "/api/cron/cleanup",
-            "schedule": "0 0 * * *"
-        }
-    ],
     "builds": [
         {
             "src": "backend/app.py",
             "use": "@vercel/python"
         }
     ],
-    "routes": [
+    "rewrites": [
         {
-            "src": "/api/(.*)",
-            "dest": "backend/app.py"
+            "source": "/static/(.*)",
+            "destination": "/static/$1"
         },
         {
-            "src": "/static/(.*)",
-            "dest": "static/$1"
-        },
-        {
-            "src": "/shopkeeper/(.*)",
-            "dest": "backend/app.py"
-        },
-        {
-            "src": "/admin(.*)",
-            "dest": "backend/app.py"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "backend/app.py"
+            "source": "/(.*)",
+            "destination": "/backend/app.py"
         }
     ],
-    "env": {
-        "SUPABASE_URL": "@supabase_url",
-        "SUPABASE_KEY": "@supabase_service_key",
-        "SHOP_NAME": "@shop_name",
-        "ADMIN_PASS": "@admin_pass",
-        "SECRET_KEY": "@secret_key"
-    },
     "headers": [
         {
             "source": "/(.*)",
@@ -67,6 +42,12 @@
                     "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
                 }
             ]
+        }
+    ],
+    "crons": [
+        {
+            "path": "/api/cron/cleanup",
+            "schedule": "0 0 * * *"
         }
     ]
 }

@@ -58,6 +58,14 @@ def login_required(f):
 def index():
     return redirect('/admin')
 
+@app.route('/customer/<path:path>')
+def serve_customer_pages(path):
+    return send_from_directory('../customer', path)
+
+@app.route('/customer')
+def customer_index():
+    return send_from_directory('../customer', 'index.html')
+
 @app.route('/admin')
 @login_required
 def admin_dashboard():
