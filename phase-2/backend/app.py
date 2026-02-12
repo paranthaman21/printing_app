@@ -10,6 +10,8 @@ from werkzeug.utils import secure_filename
 from pricing import calculate_total
 from urllib.parse import unquote
 from datetime import datetime, timedelta, timezone
+import requests
+from flask import Response
 
 # Load .env from parent directory (phase-2/.env)
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
@@ -20,8 +22,11 @@ app = Flask(__name__, static_folder="../static", template_folder="../shopkeeper"
 # Secret key for sessions
 app.secret_key = os.environ.get("SECRET_KEY", "super_secret_shopkeeper_key")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "admin123")
-TEMP_SECURE_DIR = os.path.join(app.root_path, '../secure_temp')
-os.makedirs(TEMP_SECURE_DIR, exist_ok=True)
+TEMP_SECURE_DIR = '/tmp/secure_temp' if os.environ.get('VERCEL_ENV') else os.path.join(app.root_path, '../secure_temp')
+try:
+    os.makedirs(TEMP_SECURE_DIR, exist_ok=True)
+except Exception as e:
+    print(f"Warning: Could not create temp dir: {e}")
 
 # Security configurations
 IS_PRODUCTION = os.environ.get('VERCEL_ENV') == 'production'
@@ -29,17 +34,22 @@ app.config['SESSION_COOKIE_SECURE'] = IS_PRODUCTION  # HTTPS only in production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16MB Limit for uploads
 
 # Add security headers to all responses
 @app.after_request
 def add_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    # Allow same-origin for dashboard functionality
+    response.headers['Content-Security-Policy'] = (
+    "frame-ancestors 'self' https://*.supabase.co"
+)
+
     if 'Access-Control-Allow-Origin' not in response.headers:
         response.headers['Access-Control-Allow-Origin'] = 'http://127.0.0.1:5001'
     return response
+
 
 # Decorator: Login Required
 def login_required(f):
@@ -383,34 +393,62 @@ def serve_order_file(order_id):
         res = supabase.client.table('orders').select("*").eq('id', order_id).execute()
         if not res.data:
             return jsonify({"error": "Order not found"}), 404
-            
+
         order = res.data[0]
         file_url = order.get('file_url', '')
         if not file_url:
-             return jsonify({"error": "No file url in order"}), 404
-             
+            return jsonify({"error": "No file url in order"}), 404
+
         raw_name = file_url.split('/')[-1].split('?')[0]
         filename = unquote(raw_name)
         file_path = find_upload_path(filename)
-        
-        # 1. Try Local File
+
+        # 1. Local file (Range-enabled)
         if file_path and os.path.exists(file_path):
-            if os.path.getsize(file_path) > 0:
-                mime = 'application/pdf' if filename.lower().endswith('.pdf') else None
-                log_admin_action("FILE_DOWNLOAD", order_id)
-                return send_file(file_path, mimetype=mime)
-                
-        # 2. Fallback: Redirect
+            log_admin_action("FILE_DOWNLOAD", order_id)
+            return send_file(
+                file_path,
+                mimetype='application/pdf',
+                as_attachment=False,
+                conditional=True
+            )
+
+        # 2. Supabase Proxy (Enforce Correct MIME Type)
         if file_url.startswith('http'):
             log_admin_action("FILE_DOWNLOAD", order_id)
-            return redirect(file_url)
             
-        return jsonify({"error": f"File not found or URL invalid."}), 404
-        
+            try:
+                # Extract path
+                path = unquote(file_url.split('/')[-1].split('?')[0])
+                
+                # Fetch file bytes from Supabase storage
+                # This ensures we control the serving headers, preventing 'text/plain' issue
+                file_bytes = supabase.client.storage.from_("uploads").download(path)
+                
+                # Determine MIME type
+                mimetype = 'application/pdf'
+                if path.lower().endswith(('.jpg', '.jpeg')):
+                    mimetype = 'image/jpeg'
+                elif path.lower().endswith('.png'):
+                    mimetype = 'image/png'
+                
+                from io import BytesIO
+                return send_file(
+                    BytesIO(file_bytes),
+                    mimetype=mimetype,
+                    as_attachment=False, # Open in browser
+                    download_name=path.replace(path.split('_')[0] + '_', '') # Clean filename
+                )
+                    
+            except Exception as e:
+                print(f"Proxy download failed: {e}")
+                # Fallback to redirect if proxy fails
+                return redirect(file_url)
+
+        return jsonify({"error": "Unable to serve file"}), 500
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-# --- Public Customer Endpoints ---
 
 @app.route('/api/config')
 def get_config():

@@ -508,9 +508,18 @@
             }
 
             // Efficient HTML Generation
+            const escapeHtml = (unsafe) => {
+                return (unsafe || '').toString()
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
             list.innerHTML = displayOrders.map(o => {
                 // Determine Badge
-                let badge = `<span class="badge bg-pending">${o.payment_status}</span>`;
+                let badge = `<span class="badge bg-pending">${escapeHtml(o.payment_status)}</span>`;
                 if (o.payment_status === 'PAID') badge = `<span class="badge bg-paid">PAID</span>`;
                 if (o.payment_status === 'PENDING_VERIFICATION') badge = `<span class="badge bg-verify">VERIFY UPI</span>`;
 
@@ -519,28 +528,28 @@
 
                 // Verify Button
                 if (o.payment_status === 'PENDING_VERIFICATION') {
-                    actions += `<button class="btn btn-primary" onclick="handlePayVerify('${o.id}')">Verify</button>`;
+                    actions += `<button class="btn btn-primary" onclick="handlePayVerify('${escapeHtml(o.id)}')">Verify</button>`;
                 }
 
                 // Download Button (Always)
-                actions += `<button class="btn btn-outline" onclick="window.open('/api/shop/order-file/${o.id}', '_blank')">Download</button>`;
+                actions += `<button class="btn btn-outline" onclick="window.open('/api/shop/order-file/${escapeHtml(o.id)}', '_blank')">Download</button>`;
 
                 // Done Button (Big & Green)
-                actions += `<button id="btn-done-${o.id}" class="btn btn-success" onclick="handleDone('${o.id}')">Done</button>`;
+                actions += `<button id="btn-done-${escapeHtml(o.id)}" class="btn btn-success" onclick="handleDone('${escapeHtml(o.id)}')">Done</button>`;
 
                 return `
-                    <div class="order-card" id="card-${o.id}">
+                    <div class="order-card" id="card-${escapeHtml(o.id)}">
                         <div class="order-info">
                             <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
-                                <span class="order-id">#${o.id.substring(0, 6)}</span>
+                                <span class="order-id">#${escapeHtml(o.id.substring(0, 6))}</span>
                                 ${badge}
                             </div>
                             <div class="order-details">
-                                <strong>${o.customer_name}</strong><br>
-                                ${o.total_sheets} Sheets • ${o.print_color} • ₹${o.total_amount}
+                                <strong>${escapeHtml(o.customer_name)}</strong><br>
+                                ${escapeHtml(o.total_sheets)} Sheets • ${escapeHtml(o.print_color)} • ₹${escapeHtml(o.total_amount)}
                             </div>
                             <div class="order-sub">
-                                ${o.file_name} (${o.pages} pages, ${o.copies} copies)
+                                ${escapeHtml(o.file_name)} (${escapeHtml(o.pages)} pages, ${escapeHtml(o.copies)} copies)
                             </div>
                         </div>
                         <div class="order-actions">
