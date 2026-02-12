@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print Options</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Mobile-First Fixed Layout Overrides */
+        body {
+            height: 100vh;
+            /* Full viewport height */
+            width: 100vw;
+            overflow: hidden;
+            /* Prevent body scroll */
+            display: flex;
+            flex-direction: column;
+            background-color: #ffffff;
+            /* Clean white app background */
+            margin: 0;
+            padding: 0;
+            font-family: 'Poppins', sans-serif;
+            color: var(--text-color);
+        }
+
+        /* 1. Header */
+        .app-header {
+            flex: 0 0 auto;
+            padding: 12px 16px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 1.1rem;
+            border-bottom: 1px solid #f1f5f9;
+            background: #ffffff;
+            z-index: 10;
+        }
+
+        /* 2. Scrollable Content Area */
+        .main-content {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            /* Scroll only inside this area if needed */
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            /* Space between sections */
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Section Styling */
+        .section-label {
+            font-size: 0.85rem;
+            color: #64748b;
+            /* Muted text */
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Stepper for Copies */
+        .stepper-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .step-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            color: var(--primary);
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            padding: 0;
+            margin: 0;
+        }
+
+        .step-btn:active {
+            transform: scale(0.95);
+            background: #f1f5f9;
+        }
+
+        .step-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Option Grids (2 columns) */
+        .option-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        /* Reusing .option-card class for JS compatibility, but restyling */
+        .option-card {
+            background: #ffffff;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 80px;
+        }
+
+        .option-card.active {
+            border-color: var(--primary);
+            background-color: #eff6ff;
+            color: var(--primary);
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1), 0 2px 4px -1px rgba(37, 99, 235, 0.06);
+            transform: translateY(-1px);
+        }
+
+        /* Specific Typography for Cards */
+        .opt-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+        }
+
+        .opt-price {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .option-card.active .opt-price {
+            color: #60a5fa;
+            /* Lighter blue when active */
+        }
+
+        .disabled-card {
+            opacity: 0.5;
+            filter: grayscale(1);
+            pointer-events: none;
+        }
+
+        /* 3. Fixed Bottom Bar */
+        .bottom-bar {
+            flex: 0 0 auto;
+            background: #ffffff;
+            padding: 16px;
+            border-top: 1px solid #f1f5f9;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+            z-index: 20;
+        }
+
+        .price-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .price-label-text {
+            font-size: 0.9rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .total-price-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+
+        .proceed-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .proceed-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* Hide elements ensuring layout integrity */
+        .hidden {
+            display: none;
+        }
+
+        /* Adjust for very small screens */
+        @media (max-height: 600px) {
+            .main-content {
+                gap: 12px;
+                padding: 12px;
+            }
+
+            .option-card {
+                min-height: 70px;
+                padding: 8px;
+            }
+
+            .section-label {
+                margin-bottom: 4px;
+            }
+        }
+    </style>
+</head>
+
+<body onload="initApp()"> <!-- Custom init -->
+
+    <!-- Header -->
+    <div class="app-header">
+        Configure Print
+    </div>
+
+    <!-- Scrollable Options Area -->
+    <div class="main-content">
+
+        <!-- File Preview Card -->
+        <div
+            style="background: #f1f5f9; padding: 12px; border-radius: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid #e2e8f0;">
+            <div
+                style="background: white; padding: 8px; border-radius: 8px; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; min-width: 40px;">
+                <!-- Generic File Icon -->
+                <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: var(--primary);">
+                    <path
+                        d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                </svg>
+            </div>
+            <div style="overflow: hidden;">
+                <div id="fileName"
+                    style="font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-color);">
+                    Filename.pdf</div>
+                <div id="pageCount" style="font-size: 0.8rem; color: #64748b;">Loading pages...</div>
+            </div>
+        </div>
+
+        <!-- Copies -->
+        <div>
+            <div class="section-label">Number of Copies</div>
+            <div class="stepper-container">
+                <button class="step-btn" onclick="adjustCopiesLocal(-1)">&minus;</button>
+                <span class="step-value" id="copiesDisplay">1</span>
+                <button class="step-btn" onclick="adjustCopiesLocal(1)">+</button>
+            </div>
+            <input type="hidden" id="copies" value="1">
+        </div>
+
+        <!-- Color -->
+        <div>
+            <div class="section-label">Choose Print Color</div>
+            <div class="option-grid">
+                <div class="option-card active" onclick="selectOption('color', 'BW', this)" id="opt-BW">
+                    <div class="opt-title">Black & White</div>
+                    <div class="opt-price">₹3.00 / page</div>
+                </div>
+                <div class="option-card" onclick="selectOption('color', 'COLOR', this)" id="opt-COLOR">
+                    <div class="opt-title">Coloured</div>
+                    <div class="opt-price">₹10.00 / page</div>
+                </div>
+            </div>
+            <input type="hidden" id="color" value="BW">
+        </div>
+
+        <!-- Sides (Compact) -->
+        <div>
+            <div class="section-label">Sides</div>
+            <div class="option-grid">
+                <div class="option-card active" onclick="selectOption('sides', 'SINGLE', this)" id="opt-SINGLE">
+                    <div class="opt-title">Single Side</div>
+                    <div class="opt-price">Standard</div>
+                </div>
+                <!-- Note: Double side is usually cheaper per sheet, but let's just show label -->
+                <div class="option-card" onclick="selectOption('sides', 'DOUBLE', this)" id="opt-DOUBLE">
+                    <div class="opt-title">Double Side</div>
+                    <div class="opt-price">Save Paper</div>
+                </div>
+            </div>
+            <input type="hidden" id="sides" value="SINGLE">
+            <div id="imageNote" style="display:none; color:orange; font-size:0.75rem; margin-top:4px;">Image: Single
+                side only</div>
+        </div>
+
+        <!-- Orientation -->
+        <div>
+            <div class="section-label">Choose Print Orientation</div>
+            <div class="option-grid">
+                <div class="option-card active" onclick="selectOption('orientation', 'PORTRAIT', this)"
+                    id="opt-PORTRAIT">
+                    <div class="opt-title">Portrait</div>
+                    <div class="opt-price">A4 Vertical</div>
+                </div>
+                <div class="option-card" onclick="selectOption('orientation', 'LANDSCAPE', this)" id="opt-LANDSCAPE">
+                    <div class="opt-title">Landscape</div>
+                    <div class="opt-price">A4 Horizontal</div>
+                </div>
+            </div>
+            <input type="hidden" id="orientation" value="PORTRAIT">
+        </div>
+
+        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; text-align: center;">
+            <div style="display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;">
+                <a href="/customer/terms.html"
+                    style="color: #94a3b8; text-decoration: none; font-size: 0.7rem;">Terms</a> •
+                <a href="/customer/privacy.html"
+                    style="color: #94a3b8; text-decoration: none; font-size: 0.7rem;">Privacy</a> •
+                <a href="/customer/refund.html"
+                    style="color: #94a3b8; text-decoration: none; font-size: 0.7rem;">Refunds</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fixed Bottom Bar -->
+    <div class="bottom-bar">
+        <div class="price-summary">
+            <div>
+                <div class="price-label-text">Total Price</div>
+                <div style="font-size: 0.75rem; color: #94a3b8;"><span id="totalSheets">0</span> Sheets</div>
+            </div>
+            <div class="total-price-text" id="totalPrice">₹3.00</div>
+        </div>
+        <button class="proceed-btn" onclick="goToCheckout()">Proceed to Checkout</button>
+    </div>
+
+    <!-- Load Main Logic -->
+    <script src="../static/js/main.js"></script>
+    <script>
+        // Custom Init to hook into main.js logic
+        function initApp() {
+            // Call main.js init
+            if (window.initOptionsPage) {
+                initOptionsPage();
+            }
+            // Update initial UI bits
+            const copiesVal = document.getElementById('copies').value;
+            document.getElementById('copiesDisplay').textContent = copiesVal;
+
+            // Image handling hook (re-apply logic since we rewrote HTML)
+            if (state.fileMeta && state.fileMeta.type === 'IMAGE') {
+                const doubleOpt = document.getElementById('opt-DOUBLE');
+                doubleOpt.classList.add('disabled-card');
+                doubleOpt.onclick = null;
+                document.getElementById('imageNote').style.display = 'block';
+            }
+        }
+
+        // Stepper Logic
+        function adjustCopiesLocal(delta) {
+            const input = document.getElementById('copies');
+            let val = parseInt(input.value) || 1;
+            val += delta;
+            if (val < 1) val = 1;
+            input.value = val;
+            document.getElementById('copiesDisplay').textContent = val;
+
+            // Trigger price update from main.js
+            updatePrice();
+        }
+
+        // Override selectOption from main.js if needed or ensure it works.
+        // main.js expects: selectOption(type, value, element)
+        // It toggles .active on siblings with .option-card class.
+        // Our HTML uses .option-card, so it should work out of the box!
+    </script>
+</body>
+
+</html>
