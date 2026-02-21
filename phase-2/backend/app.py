@@ -1,21 +1,27 @@
 import os
+import sys
 import shutil
 import uuid
 from flask import Flask, request, jsonify, send_from_directory, session, redirect, send_file, make_response
 from functools import wraps
 from dotenv import load_dotenv
 import time
-from db import get_supabase_client
-from werkzeug.utils import secure_filename
-from pricing import calculate_total
-from urllib.parse import unquote
 from datetime import datetime, timedelta, timezone
-import requests
-from flask import Response
+from urllib.parse import unquote
+from werkzeug.utils import secure_filename
 
-# Load .env from parent directory (phase-2/.env)
+# Ensure the backend directory is in the python path for Vercel
+backend_dir = os.path.dirname(__file__)
+if backend_dir not in sys.path:
+    sys.path.append(backend_dir)
+
+from db import get_supabase_client
+from pricing import calculate_total
+
+# Load .env (local only)
 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
-load_dotenv(env_path)
+if os.path.exists(env_path):
+    load_dotenv(env_path)
 
 app = Flask(__name__, static_folder="../static", template_folder="../shopkeeper")
 
@@ -520,6 +526,14 @@ def calculate_price_endpoint():
         return jsonify(res)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/health')
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "site_type": os.environ.get("SITE_TYPE", "UNSET")
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
