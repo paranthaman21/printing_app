@@ -8,27 +8,13 @@
     <link rel="stylesheet" href="../static/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Mobile-First Fixed Layout Overrides */
-        html,
         body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            height: 100vh;
-            /* Fallback */
-            height: 100dvh;
-            /* Dynamic viewport height for mobile */
-            width: 100vw;
-            overflow: hidden;
-            /* Prevent body scroll, use inner scroll */
-            display: flex;
-            flex-direction: column;
+            min-height: 100vh;
             background-color: #ffffff;
             font-family: 'Poppins', sans-serif;
             color: var(--text-color);
+            margin: 0;
+            padding: 0;
         }
 
         /* 1. Header */
@@ -43,17 +29,14 @@
             z-index: 10;
         }
 
-        /* 2. Scrollable Content Area */
+        /* 2. Content Area */
         .main-content {
-            flex: 1 1 auto;
-            overflow-y: auto;
-            /* Scroll only inside this area if needed */
             padding: 16px;
             display: flex;
             flex-direction: column;
             gap: 16px;
-            /* Space between sections */
-            -webkit-overflow-scrolling: touch;
+            padding-bottom: 40px;
+            /* Safe space at bottom */
         }
 
         /* Section Styling */
@@ -160,14 +143,13 @@
             pointer-events: none;
         }
 
-        /* 3. Fixed Bottom Bar */
+        /* 3. Inline Bottom Bar */
         .bottom-bar {
-            flex: 0 0 auto;
-            background: #ffffff;
-            padding: 16px 16px calc(40px + env(safe-area-inset-bottom));
-            border-top: 1px solid #f1f5f9;
-            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
-            z-index: 20;
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            margin-top: 10px;
         }
 
         .price-summary {
@@ -321,18 +303,17 @@
             </div>
             <input type="hidden" id="orientation" value="PORTRAIT">
         </div>
-    </div>
-
-    <!-- Fixed Bottom Bar -->
-    <div class="bottom-bar">
-        <div class="price-summary">
-            <div>
-                <div class="price-label-text">Total Price</div>
-                <div style="font-size: 0.75rem; color: #94a3b8;"><span id="totalSheets">0</span> Sheets</div>
+        <!-- Bottom Bar (Now inside scroll) -->
+        <div class="bottom-bar">
+            <div class="price-summary">
+                <div>
+                    <div class="price-label-text">Total Price</div>
+                    <div style="font-size: 0.75rem; color: #94a3b8;"><span id="totalSheets">0</span> Sheets</div>
+                </div>
+                <div class="total-price-text" id="totalPrice">₹3.00</div>
             </div>
-            <div class="total-price-text" id="totalPrice">₹3.00</div>
+            <button class="proceed-btn" onclick="goToCheckout()">Proceed to Checkout</button>
         </div>
-        <button class="proceed-btn" onclick="goToCheckout()">Proceed to Checkout</button>
     </div>
 
     <!-- Load Main Logic -->
