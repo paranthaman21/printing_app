@@ -66,6 +66,9 @@ def login_required(f):
 
 @app.route('/')
 def index():
+    site_type = os.environ.get("SITE_TYPE", "ADMIN")
+    if site_type == "CUSTOMER":
+        return redirect('/customer')
     return redirect('/admin')
 
 @app.route('/customer/<path:path>')
