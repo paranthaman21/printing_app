@@ -262,13 +262,25 @@ async function handleCheckout(event) {
             localStorage.setItem('lastOrder', JSON.stringify(data.order));
             window.location.href = 'success.html';
         } else {
-            alert("Order failed!");
+            console.error("Order failed!", data.error);
+            btn.innerText = "Error: " + (data.error || "Failed");
+            // Automatically reset button text after 3 seconds
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerText = "Place Order";
+            }, 3000);
+            return; // Exit early to prevent 'finally' block from resetting it immediately
         }
     } catch (e) {
-        console.error(e);
-        alert("Error creating order.");
+        console.error("Error creating order.", e);
+        btn.innerText = "Error Connecting";
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerText = "Place Order";
+        }, 3000);
+        return;
     } finally {
-        btn.disabled = false;
-        btn.innerText = "Place Order";
+        // Only hits this if success (due to returns above), but navigation will happen anyway
+        // Keeping it strictly for logic flow assurance
     }
 }
