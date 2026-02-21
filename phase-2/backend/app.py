@@ -9,6 +9,9 @@ import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import unquote
 from werkzeug.utils import secure_filename
+import smtplib
+from email.mime.text import MIMEText
+import threading
 
 # Ensure the backend directory is in the python path for Vercel
 backend_dir = os.path.dirname(__file__)
@@ -183,6 +186,41 @@ def get_shop_stats():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def send_notification_email_async(order_data):
+    try:
+        sender_email = os.environ.get("SMTP_EMAIL")
+        sender_password = os.environ.get("SMTP_PASSWORD")
+        receiver_email = os.environ.get("RECEIVER_EMAIL", "kalpanav856@gmail.com")
+
+        if not sender_email or not sender_password:
+            return
+
+        msg_body = f"""New Print Order Received!
+
+Customer: {order_data.get('customer_name')}
+Phone: {order_data.get('customer_phone')}
+File: {order_data.get('file_name')}
+Pages: {order_data.get('pages')}, Copies: {order_data.get('copies')}
+Options: {order_data.get('print_color')}, {order_data.get('print_sides')}
+Total Amount: ₹{order_data.get('total_amount')}
+Payment: {order_data.get('payment_method')} ({order_data.get('payment_status')})
+
+Please check your dashboard to process the order.
+"""
+        msg = MIMEText(msg_body)
+        msg['Subject'] = f"New Order - {order_data.get('customer_name')} (₹{order_data.get('total_amount')})"
+        msg['From'] = sender_email
+        msg['To'] = receiver_email
+
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(sender_email, sender_password)
+            smtp.send_message(msg)
+    except Exception as e:
+        print(f"Failed to send email notification: {e}")
+
+def notify_shop(order_data):
+    threading.Thread(target=send_notification_email_async, args=(order_data,), daemon=True).start()
+
 @app.route('/api/create-order', methods=['POST'])
 def create_order():
     data = request.json
@@ -246,6 +284,7 @@ def create_order():
         res = supabase.client.table('orders').insert(order_data).execute()
         
         if res.data:
+            notify_shop(order_data)
             return jsonify({"status": "success", "order": res.data[0]})
         else:
             return jsonify({"error": "Failed to create order"}), 500
