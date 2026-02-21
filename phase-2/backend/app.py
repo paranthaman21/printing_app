@@ -220,7 +220,7 @@ Link: https://barath-printing-app.vercel.app/
         print(f"Failed to send email notification: {e}")
 
 def notify_shop(order_data):
-    threading.Thread(target=send_notification_email_async, args=(order_data,), daemon=True).start()
+    send_notification_email_async(order_data)
 
 @app.route('/api/create-order', methods=['POST'])
 def create_order():
