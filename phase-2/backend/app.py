@@ -70,16 +70,29 @@ def login_required(f):
 
 # --- Shopkeeper Routes ---
 
+# --- Dynamic Routing ---
+
 @app.route('/')
 def index():
     site_type = os.environ.get("SITE_TYPE", "ADMIN")
     if site_type == "CUSTOMER":
-        return redirect('/customer')
+        return send_from_directory('../customer', 'index.html')
     return redirect('/admin')
 
-@app.route('/customer/<path:path>')
-def serve_customer_pages(path):
-    return send_from_directory('../customer', path)
+@app.route('/<path:path>')
+def serve_root_files(path):
+    # This serves files like options.html or checkout.html from the correct folder
+    # based on the SITE_TYPE environment variable.
+    site_type = os.environ.get("SITE_TYPE", "ADMIN")
+    
+    if site_type == "CUSTOMER":
+        return send_from_directory('../customer', path)
+    
+    # Default for Admin
+    if path.startswith('admin/'):
+         return send_from_directory('../shopkeeper', path.replace('admin/', ''))
+    
+    return send_from_directory('../shopkeeper', path)
 
 @app.route('/customer')
 def customer_index():
