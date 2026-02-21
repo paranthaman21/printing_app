@@ -206,6 +206,7 @@ Total Amount: ₹{order_data.get('total_amount')}
 Payment: {order_data.get('payment_method')} ({order_data.get('payment_status')})
 
 Please check your dashboard to process the order.
+Link: https://barath-printing-app.vercel.app/
 """
         msg = MIMEText(msg_body)
         msg['Subject'] = f"New Order - {order_data.get('customer_name')} (₹{order_data.get('total_amount')})"
