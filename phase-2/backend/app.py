@@ -101,10 +101,17 @@ def customer_index():
 @app.route('/admin')
 @login_required
 def admin_dashboard():
+    site_type = os.environ.get("SITE_TYPE", "ADMIN")
+    if site_type == "CUSTOMER":
+        return jsonify({"error": "Forbidden: Cannot access Admin dashboard from the Customer Portal."}), 403
     return send_from_directory('../shopkeeper', 'dashboard.html')
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
+    site_type = os.environ.get("SITE_TYPE", "ADMIN")
+    if site_type == "CUSTOMER":
+        return jsonify({"error": "Forbidden: Cannot access Admin panel from the Customer Portal."}), 403
+
     if request.method == 'GET':
         if session.get('logged_in'):
              return redirect('/admin')

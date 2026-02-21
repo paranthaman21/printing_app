@@ -8,21 +8,16 @@
     <link rel="stylesheet" href="../static/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Mobile-First Fixed Layout Overrides */
-        html,
         body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
+            display: block;
             min-height: 100vh;
+            height: auto !important;
             background-color: #ffffff;
             font-family: 'Poppins', sans-serif;
             color: var(--text-color);
             margin: 0;
             padding: 0;
+            padding-bottom: 2rem;
         }
 
         /* 1. Header */
@@ -314,12 +309,12 @@
 
         <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; text-align: center;">
             <div style="display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;">
-                <a href="/customer/terms.html"
-                    style="color: #94a3b8; text-decoration: none; font-size: 0.7rem;">Terms</a> •
-                <a href="/customer/privacy.html"
-                    style="color: #94a3b8; text-decoration: none; font-size: 0.7rem;">Privacy</a> •
-                <a href="/customer/refund.html"
-                    style="color: #94a3b8; text-decoration: none; font-size: 0.7rem;">Refunds</a>
+                <a href="terms.html" target="_blank"
+                    style="color: #94a3b8; text-decoration: none; font-size: 0.7rem;">Terms & Conditions</a> •
+                <a href="privacy.html" target="_blank"
+                    style="color: #94a3b8; text-decoration: none; font-size: 0.7rem;">Privacy Policy</a> •
+                <a href="refund.html" target="_blank"
+                    style="color: #94a3b8; text-decoration: none; font-size: 0.7rem;">Refund Policy</a>
             </div>
         </div>
         <!-- Bottom Bar (Now inside scroll) -->
