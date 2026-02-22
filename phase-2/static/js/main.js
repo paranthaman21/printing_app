@@ -42,52 +42,75 @@ async function handleUpload(event) {
     progressBar.style.width = '0%';
     loadingText.innerText = 'Uploading... 0%';
 
-    // Use XHR for progress tracking
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_BASE}/upload`, true);
+    try {
+        // 1. Get Signed URL
+        const urlRes = await fetch(`${API_BASE}/get-upload-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: file.name, content_type: file.type || 'application/octet-stream' })
+        });
+        const urlData = await urlRes.json();
+        if (urlData.error) throw new Error(urlData.error);
 
-    xhr.upload.onprogress = function (e) {
-        if (e.lengthComputable) {
-            const percentComplete = Math.round((e.loaded / e.total) * 100);
+        const signedUrl = urlData.signed_url || urlData.signedUrl;
+        const filePath = urlData.path;
 
-            // If it's too fast (localhost), giving it a visual "feel" isn't easy with just XHR
-            // But we can ensure the text updates clearly.
-            progressBar.style.width = percentComplete + '%';
+        // 2. Upload to Supabase directly
+        await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', signedUrl, true);
+            // Must set the exact content type used for signing the URL!
+            xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
-            if (percentComplete < 100) {
-                loadingText.innerText = `Uploading... ${percentComplete}%`;
-            } else {
-                loadingText.innerText = 'Upload complete. Processing file...';
-                // Add a "pulse" effect or change color to indicate server-side work
-                progressBar.style.backgroundColor = '#10b981'; // Greenish
-            }
-        }
-    };
+            xhr.upload.onprogress = function (e) {
+                if (e.lengthComputable) {
+                    const percentComplete = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = percentComplete + '%';
+                    if (percentComplete < 100) {
+                        loadingText.innerText = `Uploading... ${percentComplete}%`;
+                    } else {
+                        loadingText.innerText = 'Upload complete. Processing file...';
+                        progressBar.style.backgroundColor = '#10b981';
+                    }
+                }
+            };
 
-    xhr.onload = function () {
-        if (xhr.status === 200) {
-            const data = JSON.parse(xhr.responseText);
-            localStorage.setItem('printFileMeta', JSON.stringify(data));
-            loadingText.innerText = 'Success! Redirecting...';
-            progressBar.style.width = '100%';
-            setTimeout(() => {
-                window.location.href = 'options.html';
-            }, 500);
-        } else {
-            let errorMsg = "Upload failed";
-            try {
-                const errData = JSON.parse(xhr.responseText);
-                errorMsg = errData.error || errorMsg;
-            } catch (e) { }
-            alert(`Error: ${errorMsg}`);
-            resetUI();
-        }
-    };
+            xhr.onload = function () {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve();
+                } else {
+                    reject(new Error(`Supabase upload failed: ${xhr.statusText}`));
+                }
+            };
 
-    xhr.onerror = function () {
-        alert("An error occurred during upload.");
+            xhr.onerror = function () {
+                reject(new Error("Network error during upload. Ensure Supabase bucket CORS is configured for PUT."));
+            };
+
+            xhr.send(file);
+        });
+
+        // 3. Process the file
+        const processRes = await fetch(`${API_BASE}/process-upload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filePath })
+        });
+        const data = await processRes.json();
+        if (data.error) throw new Error(data.error);
+
+        // Success
+        localStorage.setItem('printFileMeta', JSON.stringify(data));
+        loadingText.innerText = 'Success! Redirecting...';
+        progressBar.style.width = '100%';
+        setTimeout(() => {
+            window.location.href = 'options.html';
+        }, 500);
+
+    } catch (err) {
+        alert(`Error: ${err.message}`);
         resetUI();
-    };
+    }
 
     function resetUI() {
         btn.innerText = originalText;
@@ -95,9 +118,8 @@ async function handleUpload(event) {
         progressContainer.style.display = 'none';
         loadingText.style.display = 'none';
         progressBar.style.width = '0%';
+        progressBar.style.backgroundColor = '';
     }
-
-    xhr.send(formData);
 }
 
 // --- Options Page Logic ---

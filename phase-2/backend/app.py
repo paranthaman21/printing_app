@@ -43,7 +43,7 @@ app.config['SESSION_COOKIE_SECURE'] = IS_PRODUCTION  # HTTPS only in production
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024 # 16MB Limit for uploads
+app.config['MAX_CONTENT_LENGTH'] = 60 * 1024 * 1024 # 60MB Limit for uploads
 
 # Add security headers to all responses
 @app.after_request
@@ -572,6 +572,76 @@ def upload_file():
             
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
+@app.route('/api/get-upload-url', methods=['POST'])
+def get_upload_url():
+    data = request.json
+    filename = data.get('filename')
+    content_type = data.get('content_type', 'application/octet-stream')
+    if not filename:
+        return jsonify({"error": "No filename"}), 400
+
+    filename = secure_filename(filename)
+    unique_name = f"{uuid.uuid4()}_{filename}"
+    
+    try:
+        supabase = get_supabase_client()
+        # Create signed upload url (bypasses Vercel 4.5MB payload limit)
+        res = supabase.client.storage.from_("uploads").create_signed_upload_url(unique_name)
+        
+        signed_url = res.get('signed_url') if isinstance(res, dict) else res.get('signedUrl')
+        # If relative URL returned (depends on client version), construct absolute URL
+        if signed_url and signed_url.startswith('/'):
+            supabase_url = os.environ.get("SUPABASE_URL", "").rstrip('/')
+            signed_url = f"{supabase_url}{signed_url}"
+        
+        public_url = supabase.client.storage.from_("uploads").get_public_url(unique_name)
+        
+        return jsonify({
+            "signed_url": signed_url,
+            "path": unique_name,
+            "public_url": public_url
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/process-upload', methods=['POST'])
+def process_upload():
+    data = request.json
+    path = data.get('path')
+    if not path:
+        return jsonify({"error": "No file path provided"}), 400
+        
+    try:
+        supabase = get_supabase_client()
+        
+        # Determine file type
+        original_filename = path.split('_', 1)[1] if '_' in path else path
+        
+        # Download file to memory to count pages (downloads bypass Vercel body limits)
+        file_bytes = supabase.client.storage.from_("uploads").download(path)
+        
+        pages = 1
+        if original_filename.lower().endswith('.pdf'):
+            try:
+                import pypdf
+                from io import BytesIO
+                pdf_file = pypdf.PdfReader(BytesIO(file_bytes))
+                pages = len(pdf_file.pages)
+            except Exception as e:
+                print("PDF page parsing failed:", e)
+                
+        public_url = supabase.client.storage.from_("uploads").get_public_url(path)
+        
+        return jsonify({
+            "message": "File processed successfully",
+            "url": public_url,
+            "filename": path,
+            "pages": pages,
+            "type": "PDF" if original_filename.lower().endswith('.pdf') else "IMAGE"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/calculate-price', methods=['POST'])
 def calculate_price_endpoint():
