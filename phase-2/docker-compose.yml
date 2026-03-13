@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: phase-2-app
+    ports:
+      - "5001:5001"
+    env_file:
+      - .env
+    volumes:
+      - ./uploads:/app/uploads
+      - ./secure_temp:/app/secure_temp
+    restart: unless-stopped
