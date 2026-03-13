@@ -31,6 +31,9 @@ app = Flask(__name__, static_folder="../static", template_folder="../shopkeeper"
 # Secret key for sessions
 app.secret_key = os.environ.get("SECRET_KEY", "super_secret_shopkeeper_key")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASS", "admin123")
+if ADMIN_PASSWORD and ADMIN_PASSWORD.startswith(("'","\"")) and ADMIN_PASSWORD.endswith(("'","\"")):
+    ADMIN_PASSWORD = ADMIN_PASSWORD[1:-1]
+    
 TEMP_SECURE_DIR = '/tmp/secure_temp' if os.environ.get('VERCEL_ENV') else os.path.join(app.root_path, '../secure_temp')
 try:
     os.makedirs(TEMP_SECURE_DIR, exist_ok=True)
@@ -666,4 +669,4 @@ def health_check():
     })
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    app.run(host='0.0.0.0', debug=True, port=5001)
